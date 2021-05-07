@@ -15,6 +15,7 @@ from unet import UNet
 from torch.utils.tensorboard import SummaryWriter
 from utils.dataset import BasicDataset
 from torch.utils.data import DataLoader, random_split
+import gc
 
 dir_img = 'data/imgs/'
 dir_mask = 'data/masks/'
@@ -29,8 +30,7 @@ def train_net(net,
               val_percent=0.1,
               save_cp=True,
               img_scale=0.5):
-
-    dataset = BasicDataset(dir_img, dir_mask, img_scale)
+    dataset = BasicDataset(dir_img, dir_mask, img_scale, '_mask')
     n_val = int(len(dataset) * val_percent)
     n_train = len(dataset) - n_val
     train, val = random_split(dataset, [n_train, n_val])
@@ -143,6 +143,12 @@ def get_args():
 
 
 if __name__ == '__main__':
+
+    # clear cuda memory
+    torch.cuda.empty_cache()
+    gc.collect()
+    print(torch.cuda.memory_summary(device=None, abbreviated=False))
+
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

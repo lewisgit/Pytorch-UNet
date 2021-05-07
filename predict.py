@@ -17,7 +17,8 @@ def predict_img(net,
                 full_img,
                 device,
                 scale_factor=1,
-                out_threshold=0.5):
+                out_threshold=0.5,
+                export_onnx=False):
     net.eval()
 
     img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor))
@@ -45,6 +46,26 @@ def predict_img(net,
 
         probs = tf(probs.cpu())
         full_mask = probs.squeeze().cpu().numpy()
+
+         # Export the model
+        if export_onnx:
+          img = torch.zeros(1, 3, 512, 512).to(device)
+          torch.onnx.export(net,               # model being run
+                            img,                         # model input (or a tuple for multiple inputs)
+                            "unet_pytorch.onnx",   # where to save the model (can be a file or file-like object)
+                            #verbose=True,
+                            #export_params=True,        # store the trained parameter weights inside the model file
+                            opset_version=11,          # the ONNX version to export the model to
+                            #do_constant_folding=True,  # whether to execute constant folding for optimization
+                            input_names = ['input'],   # the model's input names
+                            #output_names = ['output'], # the model's output names
+                            output_names = ['output']) # the model's output names
+                            #dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
+                            #              'output' : {0 : 'batch_size'}})
+          model = onnx.load("unet_onnx.onnx")
+          model_sim, check = simplify(model)
+          assert check, "Simplified ONNX model could not be validated"
+          onnx.save(model_sim, "unet_sim.onnx")
 
     return full_mask > out_threshold
 
@@ -118,7 +139,7 @@ if __name__ == "__main__":
 
         img = Image.open(fn)
 
-        mask = predict_img(net=net,
+        mask,full_mask = predict_img(net=net,
                            full_img=img,
                            scale_factor=args.scale,
                            out_threshold=args.mask_threshold,
@@ -133,4 +154,4 @@ if __name__ == "__main__":
 
         if args.viz:
             logging.info("Visualizing results for image {}, close to continue ...".format(fn))
-            plot_img_and_mask(img, mask)
+            plot_img_and_mask(img, mask, full_mask)
