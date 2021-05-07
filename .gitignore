@@ -1,4 +1,5 @@
 *.pyc
+*.onnx
 data/
 __pycache__/
 checkpoints/

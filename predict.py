@@ -12,13 +12,18 @@ from unet import UNet
 from utils.data_vis import plot_img_and_mask
 from utils.dataset import BasicDataset
 
+import onnx
+from onnxsim import simplify
+
+
 
 def predict_img(net,
                 full_img,
                 device,
                 scale_factor=1,
                 out_threshold=0.5,
-                export_onnx=False):
+                export_onnx=False,
+                export_dir='models'):
     net.eval()
 
     img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor))
@@ -50,9 +55,10 @@ def predict_img(net,
          # Export the model
         if export_onnx:
           img = torch.zeros(1, 3, 512, 512).to(device)
+          onnx_path = os.path.join(export_dir,"unet_onnx.onnx")
           torch.onnx.export(net,               # model being run
                             img,                         # model input (or a tuple for multiple inputs)
-                            "unet_pytorch.onnx",   # where to save the model (can be a file or file-like object)
+                            onnx_path,   # where to save the model (can be a file or file-like object)
                             #verbose=True,
                             #export_params=True,        # store the trained parameter weights inside the model file
                             opset_version=11,          # the ONNX version to export the model to
@@ -62,12 +68,13 @@ def predict_img(net,
                             output_names = ['output']) # the model's output names
                             #dynamic_axes={'input' : {0 : 'batch_size'},    # variable length axes
                             #              'output' : {0 : 'batch_size'}})
-          model = onnx.load("unet_onnx.onnx")
+          model = onnx.load(onnx_path)
           model_sim, check = simplify(model)
           assert check, "Simplified ONNX model could not be validated"
-          onnx.save(model_sim, "unet_sim.onnx")
+          onnx_sim_path = os.path.join(export_dir, 'unet_onnx_sim.onnx')
+          onnx.save(model_sim, onnx_sim_path)
 
-    return full_mask > out_threshold
+    return full_mask > out_threshold, full_mask
 
 
 def get_args():
@@ -93,6 +100,9 @@ def get_args():
     parser.add_argument('--scale', '-s', type=float,
                         help="Scale factor for the input images",
                         default=0.5)
+    parser.add_argument('--export-onnx', '-e', action='store_true',
+                        help="export onnx model",
+                        default=False)
 
     return parser.parse_args()
 
@@ -143,7 +153,8 @@ if __name__ == "__main__":
                            full_img=img,
                            scale_factor=args.scale,
                            out_threshold=args.mask_threshold,
-                           device=device)
+                           device=device,
+                           export_onnx=args.export_onnx)
 
         if not args.no_save:
             out_fn = out_files[i]
