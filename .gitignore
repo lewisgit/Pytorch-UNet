@@ -1,5 +1,6 @@
 *.pyc
 *.onnx
+.vscode/
 data/
 __pycache__/
 checkpoints/
@@ -8,3 +9,4 @@ checkpoints/
 SUBMISSION*
 venv/
 runs/
+.ipynb_checkpoints
